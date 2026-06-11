@@ -1,0 +1,24 @@
+# ============================================
+# 咖啡大师 AI - Docker Compose 一键部署
+# 启动: docker-compose up -d
+# ============================================
+
+services:
+  coffee-ai:
+    build: .
+    container_name: coffee-ai
+    ports:
+      - "5000:5000"
+    environment:
+      # ⚠️ 必须填写你的 DeepSeek API Key
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-chat}
+      - SECRET_KEY=${SECRET_KEY:-production-secret-change-me}
+      - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
+    restart: unless-stopped
+    # 可加资源限制
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
