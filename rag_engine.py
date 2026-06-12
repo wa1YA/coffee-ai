@@ -72,9 +72,18 @@ class EmbeddingEngine:
 
     @property
     def dim(self) -> int:
+        """返回实际向量维度，需在 fit 之后调用"""
         if self._mode == "transformer":
-            return self._model.get_sentence_embedding_dimension()
-        return 512
+            try:
+                return self._model.get_sentence_embedding_dimension()
+            except Exception:
+                return self._model.get_embedding_dimension()
+        elif self._mode == "tfidf" and self._vectorizer is not None:
+            try:
+                return len(self._vectorizer.get_feature_names_out())
+            except Exception:
+                pass
+        return 384  # 兜底默认值
 
     def fit(self, texts: list[str]):
         """TF-IDF模式需要先拟合"""
