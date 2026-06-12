@@ -3,7 +3,8 @@
 """
 import os
 import sys
-from flask import Flask, request, jsonify, render_template
+from functools import wraps
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 
 # Windows GBK 编码修复
 if sys.platform == "win32":
@@ -14,6 +15,7 @@ if sys.platform == "win32":
 from config import Config
 from rag_engine import RAGEngine
 from agent import AIAgent
+import auth
 
 
 class LLMClient:
@@ -59,6 +61,20 @@ def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = Config.SECRET_KEY
 
+    # 初始化用户数据库
+    auth.init_db()
+
+    def login_required(f):
+        """鉴权装饰器：API返回401，页面重定向到登录页"""
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if "username" not in session:
+                if request.is_json or request.path.startswith("/api/"):
+                    return jsonify({"error": "请先登录"}), 401
+                return redirect(url_for("login_page"))
+            return f(*args, **kwargs)
+        return decorated
+
     # HuggingFace 镜像
     if not os.environ.get("HF_ENDPOINT"):
         os.environ["HF_ENDPOINT"] = Config.HF_ENDPOINT
@@ -77,22 +93,29 @@ def create_app():
     print("=" * 50)
 
     # 路由
+    @app.route("/login")
+    def login_page():
+        if "username" in session:
+            return redirect(url_for("index"))
+        return render_template("login.html")
+
     @app.route("/")
+    @login_required
     def index():
         return render_template("index.html")
 
     @app.route("/api/chat", methods=["POST"])
+    @login_required
     def chat():
         data = request.get_json()
         if not data:
             return jsonify({"error": "请求格式错误"}), 400
         message = (data.get("message") or "").strip()
-        user_id = data.get("user_id", "default")
 
         if not message:
             return jsonify({"error": "消息不能为空"}), 400
 
-        result = agent.process(message, user_id)
+        result = agent.process(message, session["username"])
         return jsonify({
             "reply": result["reply"],
             "intent": result["intent"],
@@ -103,6 +126,7 @@ def create_app():
         })
 
     @app.route("/api/stats", methods=["GET"])
+    @login_required
     def stats():
         return jsonify({
             "doc_count": rag.index.doc_count if rag.index else 0,
@@ -111,6 +135,42 @@ def create_app():
             "llm_model": llm.model if llm.is_ready else None,
             "status": "running",
         })
+
+    @app.route("/api/register", methods=["POST"])
+    def register():
+        data = request.get_json() or {}
+        ok, error = auth.register_user(
+            data.get("email") or "",
+            data.get("username") or "",
+            data.get("password") or ""
+        )
+        if not ok:
+            return jsonify({"error": error}), 400
+        session["username"] = data.get("username", "").strip()
+        return jsonify({"username": session["username"]})
+
+    @app.route("/api/login", methods=["POST"])
+    def login():
+        data = request.get_json() or {}
+        ok, result = auth.login_user(
+            data.get("username") or "",
+            data.get("password") or ""
+        )
+        if ok:
+            session["username"] = result
+            return jsonify({"username": result})
+        return jsonify({"error": result}), 401
+
+    @app.route("/api/logout", methods=["POST"])
+    def logout():
+        session.pop("username", None)
+        return jsonify({"ok": True})
+
+    @app.route("/api/me", methods=["GET"])
+    def me():
+        if "username" in session:
+            return jsonify({"username": session["username"]})
+        return jsonify({"username": None})
 
     @app.route("/health", methods=["GET"])
     def health():

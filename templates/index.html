@@ -187,6 +187,13 @@
     color: var(--muted);
   }
   .quick-asks button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+  .header-user { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .logout-btn {
+    font-size: 12px; background: none; border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 10px; cursor: pointer; color: var(--muted);
+  }
+  .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
 </style>
 </head>
 <body>
@@ -197,6 +204,7 @@
     <div class="badge-row">
       <span class="badge badge-rag">RAG 检索增强</span>
       <span class="badge badge-agent">Agent 意图路由</span>
+      <span class="header-user" id="headerUser"></span>
     </div>
   </div>
 
@@ -228,6 +236,28 @@
 </div>
 
 <script>
+// ===== 用户信息 =====
+const headerUser = document.getElementById('headerUser');
+let currentUser = '';
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/login';
+}
+
+(async function loadUser() {
+  try {
+    const resp = await fetch('/api/me');
+    const data = await resp.json();
+    if (data.username) {
+      currentUser = data.username;
+      headerUser.innerHTML = '👤 ' + esc(currentUser)
+        + ' <button class="logout-btn" onclick="logout()">退出</button>';
+    }
+  } catch (_) {}
+})();
+
+// ===== Chat =====
 const chatArea = document.getElementById('chatArea');
 const inputBox = document.getElementById('inputBox');
 const sendBtn = document.getElementById('sendBtn');
@@ -287,7 +317,7 @@ async function send(msg) {
     const resp = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, user_id: 'demo' }),
+      body: JSON.stringify({ message: text, user_id: currentUser || 'anonymous' }),
     });
     const data = await resp.json();
 

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 — 咖啡大师 Coffee AI</title>
+<style>
+  :root {
+    --bg: #FFF8F0;
+    --card: #fff;
+    --text: #3D2B1F;
+    --muted: #8B7355;
+    --border: #E0D3C4;
+    --accent: #6B3F2A;
+    --accent-light: #8B5E3C;
+    --danger: #DC2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ============ 左侧角色区 ============ */
+  .mascot-area {
+    flex: 1 1 50%;
+    background: linear-gradient(180deg, #FFF7F0 0%, #FFF0E0 30%, #F5E6D6 70%, #EDD9C4 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 30px;
+    position: relative;
+    overflow: hidden;
+    padding-bottom: 60px;
+  }
+  /* 地板 */
+  .mascot-area::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: linear-gradient(180deg, rgba(139,94,60,.08) 0%, rgba(139,94,60,.15) 30%, rgba(139,94,60,.2) 100%);
+    border-radius: 60% 60% 0 0 / 100% 100% 0 0;
+  }
+
+  /* 每个角色 */
+  .critter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 2;
+    position: relative;
+    animation: fallIn .7s cubic-bezier(.22,.61,.36,1) both;
+  }
+  .critter:nth-child(2) { animation-delay: .08s; }
+  .critter:nth-child(3) { animation-delay: .16s; }
+
+  @keyframes fallIn {
+    0%   { transform: translateY(-350px) scale(.3) rotate(-20deg); opacity: 0; }
+    45%  { transform: translateY(30px) scale(1.08) rotate(6deg); opacity: 1; }
+    65%  { transform: translateY(-20px) scale(.94) rotate(-3deg); }
+    85%  { transform: translateY(8px) scale(1.02) rotate(1deg); }
+    100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  /* 浮动动画 */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-12px); }
+  }
+  .critter:nth-child(1) .body-wrap { animation: float 3.2s ease-in-out infinite; }
+  .critter:nth-child(2) .body-wrap { animation: float 3.8s ease-in-out .4s infinite; }
+  .critter:nth-child(3) .body-wrap { animation: float 3.5s ease-in-out .8s infinite; }
+
+  /* 身体包裹 */
+  .body-wrap {
+    position: relative;
+    filter: drop-shadow(0 8px 16px rgba(107,63,42,.15));
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  /* 身体 */
+  .blob {
+    position: relative;
+    border-radius: 55% 45% 50% 50% / 55% 50% 50% 45%;
+  }
+  .critter:nth-child(1) .blob {
+    width: 130px; height: 120px;
+    background: radial-gradient(ellipse at 35% 28%, #FFF5EE 0%, #F5D5B8 25%, #E8B98A 55%, #C8946A 100%);
+  }
+  .critter:nth-child(2) .blob {
+    width: 100px; height: 94px;
+    background: radial-gradient(ellipse at 35% 28%, #FFF8F2 0%, #FDE0CC 25%, #F0C8A0 55%, #D4A580 100%);
+    border-radius: 50% 50% 50% 48% / 52% 48% 52% 48%;
+  }
+  .critter:nth-child(3) .blob {
+    width: 115px; height: 108px;
+    background: radial-gradient(ellipse at 35% 28%, #FFF0E8 0%, #F5CFB0 25%, #E0B080 55%, #BD8C60 100%);
+    border-radius: 48% 52% 48% 50% / 55% 50% 50% 45%;
+  }
+
+  /* 头顶高光 */
+  .blob::before {
+    content: '';
+    position: absolute;
+    top: 12%;
+    left: 25%;
+    width: 35%; height: 15%;
+    background: rgba(255,255,255,.35);
+    border-radius: 50%;
+    filter: blur(6px);
+  }
+
+  /* 眼睛 */
+  .eyes-wrap {
+    position: absolute;
+    top: 28%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    z-index: 3;
+  }
+  .critter:nth-child(2) .eyes-wrap { gap: 14px; top: 26%; }
+  .critter:nth-child(3) .eyes-wrap { gap: 16px; top: 27%; }
+
+  .eye {
+    width: 24px; height: 28px;
+    background: #fff;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.06), 0 0 0 2px rgba(80,40,20,.08);
+    transition: transform .2s ease;
+  }
+  .critter:nth-child(2) .eye { width: 19px; height: 23px; }
+  .critter:nth-child(3) .eye { width: 22px; height: 26px; }
+
+  .pupil {
+    width: 13px; height: 15px;
+    background: radial-gradient(circle at 40% 35%, #4a3520 0%, #1a1008 100%);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform .08s ease-out;
+  }
+  .pupil::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 4px; height: 4px;
+    background: #fff;
+    border-radius: 50%;
+    opacity: .9;
+  }
+  .pupil::before {
+    content: '';
+    position: absolute;
+    bottom: 1px; right: 1.5px;
+    width: 2px; height: 2px;
+    background: #fff;
+    border-radius: 50%;
+    opacity: .5;
+  }
+  .critter:nth-child(2) .pupil { width: 10px; height: 12px; }
+  .critter:nth-child(2) .pupil::after { width: 3px; height: 3px; }
+  .critter:nth-child(3) .pupil { width: 11px; height: 13px; }
+
+  /* 嘴巴 */
+  .mouth-shape {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, 0);
+    width: 16px; height: 8px;
+    border-bottom: 2.5px solid #8B5A3C;
+    border-radius: 0 0 12px 12px;
+    transition: all .3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 3;
+  }
+  .critter:nth-child(2) .mouth-shape { width: 13px; height: 7px; border-width: 2px; }
+  .critter:nth-child(3) .mouth-shape { width: 15px; height: 8px; }
+
+  /* 聚焦时：O嘴 */
+  .mascot-focused .mouth-shape {
+    width: 13px; height: 13px;
+    border: 2.5px solid #8B5A3C;
+    border-radius: 50%;
+    background: rgba(139,90,60,.15);
+  }
+
+  /* 腮红 */
+  .cheek {
+    position: absolute;
+    top: 45%;
+    width: 16px; height: 10px;
+    background: rgba(255,160,140,.3);
+    border-radius: 50%;
+    filter: blur(3px);
+  }
+  .cheek-l { left: 0; }
+  .cheek-r { right: 0; }
+  .critter:nth-child(2) .cheek { width: 13px; height: 8px; }
+  .critter:nth-child(3) .cheek { width: 15px; height: 9px; }
+
+  /* 小红晕 (聚焦时变深) */
+  .mascot-focused .cheek {
+    background: rgba(255,140,120,.5);
+  }
+
+  /* 小脚 */
+  .legs {
+    display: flex;
+    gap: 18px;
+    margin-top: 2px;
+    z-index: 2;
+  }
+  .critter:nth-child(2) .legs { gap: 14px; }
+  .critter:nth-child(3) .legs { gap: 16px; }
+
+  .leg {
+    width: 20px; height: 14px;
+    border-radius: 10px 10px 7px 7px;
+    transition: transform .3s ease;
+  }
+  .critter:nth-child(1) .leg { background: #C8946A; }
+  .critter:nth-child(2) .leg { background: #D4A580; width: 17px; height: 12px; }
+  .critter:nth-child(3) .leg { background: #BD8C60; width: 18px; height: 13px; }
+
+  /* 密码聚焦 -> 闭眼 */
+  .mascot-shy .eye { transform: scaleY(.08); }
+  .mascot-shy .pupil { opacity: 0; }
+  .mascot-shy .body-wrap { transform: scale(.93); }
+  .mascot-shy .blob { filter: brightness(.9); }
+
+  /* 提交中 -> 闭眼 + 紧张 */
+  .mascot-submit .eye { animation: blinkFast .12s ease 3; }
+  @keyframes blinkFast {
+    0%, 100% { transform: scaleY(1); }
+    50%      { transform: scaleY(.06); }
+  }
+  .mascot-submit .body-wrap { transform: scale(.9); }
+  .mascot-submit .mouth-shape {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #8B5A3C;
+    border: none;
+  }
+
+  /* 摇动 */
+  .critter.shake { animation: wiggle .5s ease; }
+  @keyframes wiggle {
+    0%,100% { transform: translateX(0) rotate(0deg); }
+    15%     { transform: translateX(-10px) rotate(-6deg); }
+    35%     { transform: translateX(10px) rotate(6deg); }
+    55%     { transform: translateX(-7px) rotate(-4deg); }
+    75%     { transform: translateX(7px) rotate(4deg); }
+    90%     { transform: translateX(-2px) rotate(-1deg); }
+  }
+  /* 停止浮动动画让摇动生效 */
+  .critter.shake .body-wrap { animation: none; }
+
+  /* ============ 右侧表单 ============ */
+  .form-area {
+    flex: 1 1 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    box-shadow: -4px 0 40px rgba(0,0,0,.06);
+    z-index: 2;
+    padding: 50px 60px;
+  }
+  .form-card {
+    width: 100%;
+    max-width: 400px;
+  }
+  .form-card .logo { text-align: center; font-size: 44px; margin-bottom: 4px; }
+  .form-card h2 {
+    font-size: 26px; text-align: center; color: var(--accent); font-weight: 800;
+  }
+  .form-card .subtitle {
+    text-align: center; font-size: 14px; color: var(--muted); margin-bottom: 36px; margin-top: 6px;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-group label {
+    display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px;
+  }
+  .form-group input {
+    width: 100%; padding: 14px 16px;
+    border: 1.5px solid var(--border); border-radius: 12px;
+    font-size: 15px; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    background: #FAFAFA;
+  }
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(107,63,42,.1);
+    background: #fff;
+  }
+  .form-group input.error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(220,38,38,.1);
+    animation: shakeInput .4s ease;
+  }
+  @keyframes shakeInput {
+    0%,100% { transform: translateX(0); }
+    25%     { transform: translateX(-5px); }
+    50%     { transform: translateX(5px); }
+    75%     { transform: translateX(-3px); }
+  }
+  .field-error { font-size: 12px; color: var(--danger); margin-top: 4px; min-height: 18px; }
+  .submit-btn {
+    width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+    color: #fff; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: opacity .2s, transform .15s;
+    margin-top: 12px; letter-spacing: 3px;
+  }
+  .submit-btn:hover { opacity: .9; }
+  .submit-btn:active { transform: scale(.98); }
+  .submit-btn:disabled { opacity: .5; cursor: default; transform: none; }
+
+  .switch-row { text-align: center; margin-top: 24px; font-size: 14px; color: var(--muted); }
+  .switch-row button {
+    background: none; border: none; color: var(--accent);
+    font-weight: 700; cursor: pointer; font-size: 14px; text-decoration: underline;
+  }
+  .switch-row button:hover { opacity: .7; }
+
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #fff; padding: 14px 32px; border-radius: 12px;
+    font-size: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+    z-index: 99; animation: toastIn .3s ease; font-weight: 600;
+  }
+  .toast.error  { border: 1px solid var(--danger); color: var(--danger); }
+  .toast.success { border: 1px solid #16a34a; color: #16a34a; }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  @media (max-width: 800px) {
+    body { flex-direction: column; }
+    .mascot-area { flex: 0 0 160px; padding-bottom: 30px; gap: 16px; }
+    .mascot-area::after { height: 30px; }
+    .critter:nth-child(1) .blob { width: 70px; height: 65px; }
+    .critter:nth-child(2) .blob { width: 54px; height: 50px; }
+    .critter:nth-child(3) .blob { width: 62px; height: 58px; }
+    .form-area { flex: 1; padding: 24px 30px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 左侧 ==================== -->
+<div class="mascot-area" id="mascotArea">
+
+  <div class="critter" id="c1">
+    <div class="body-wrap">
+      <div class="blob">
+        <div class="eyes-wrap">
+          <div class="eye"><div class="pupil"></div></div>
+          <div class="eye"><div class="pupil"></div></div>
+        </div>
+        <div class="cheek cheek-l"></div>
+        <div class="cheek cheek-r"></div>
+        <div class="mouth-shape"></div>
+      </div>
+    </div>
+    <div class="legs">
+      <div class="leg"></div>
+      <div class="leg"></div>
+    </div>
+  </div>
+
+  <div class="critter" id="c2">
+    <div class="body-wrap">
+      <div class="blob">
+        <div class="eyes-wrap">
+          <div class="eye"><div class="pupil"></div></div>
+          <div class="eye"><div class="pupil"></div></div>
+        </div>
+        <div class="cheek cheek-l"></div>
+        <div class="cheek cheek-r"></div>
+        <div class="mouth-shape"></div>
+      </div>
+    </div>
+    <div class="legs">
+      <div class="leg"></div>
+      <div class="leg"></div>
+    </div>
+  </div>
+
+  <div class="critter" id="c3">
+    <div class="body-wrap">
+      <div class="blob">
+        <div class="eyes-wrap">
+          <div class="eye"><div class="pupil"></div></div>
+          <div class="eye"><div class="pupil"></div></div>
+        </div>
+        <div class="cheek cheek-l"></div>
+        <div class="cheek cheek-r"></div>
+        <div class="mouth-shape"></div>
+      </div>
+    </div>
+    <div class="legs">
+      <div class="leg"></div>
+      <div class="leg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 右侧表单 ==================== -->
+<div class="form-area">
+  <div class="form-card">
+    <div class="logo">☕</div>
+    <h2 id="formTitle">欢迎回来</h2>
+    <p class="subtitle" id="formSubtitle">登录你的咖啡大师账号</p>
+
+    <form id="authForm" autocomplete="off" novalidate>
+      <!-- 登录: 用户名/邮箱 | 注册: 先用户名再邮箱 -->
+      <div class="form-group" id="loginField">
+        <label for="loginInput">用户名 / 邮箱</label>
+        <input type="text" id="loginInput" placeholder="输入用户名或邮箱" autocomplete="username">
+        <div class="field-error" id="loginError"></div>
+      </div>
+
+      <div class="form-group" id="regUserGroup" style="display:none">
+        <label for="usernameInput">用户名</label>
+        <input type="text" id="usernameInput" placeholder="2-20个字符" maxlength="20" autocomplete="off">
+        <div class="field-error" id="usernameError"></div>
+      </div>
+
+      <div class="form-group" id="regEmailGroup" style="display:none">
+        <label for="emailInput">邮箱</label>
+        <input type="email" id="emailInput" placeholder="请输入邮箱地址" autocomplete="email">
+        <div class="field-error" id="emailError"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="passwordInput">密码</label>
+        <input type="password" id="passwordInput" placeholder="至少4个字符" autocomplete="current-password">
+        <div class="field-error" id="passwordError"></div>
+      </div>
+
+      <div class="form-group" id="confirmGroup" style="display:none">
+        <label for="confirmInput">确认密码</label>
+        <input type="password" id="confirmInput" placeholder="再次输入密码" autocomplete="off">
+        <div class="field-error" id="confirmError"></div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">登 录</button>
+    </form>
+
+    <div class="switch-row">
+      <span id="switchText">还没有账号？</span>
+      <button id="switchBtn" type="button">立即注册</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const mascotArea = document.getElementById('mascotArea');
+const loginInput = document.getElementById('loginInput');
+const usernameInput = document.getElementById('usernameInput');
+const emailInput = document.getElementById('emailInput');
+const passwordInput = document.getElementById('passwordInput');
+const confirmInput = document.getElementById('confirmInput');
+const submitBtn = document.getElementById('submitBtn');
+const formTitle = document.getElementById('formTitle');
+const formSubtitle = document.getElementById('formSubtitle');
+const switchBtn = document.getElementById('switchBtn');
+const switchText = document.getElementById('switchText');
+const loginField = document.getElementById('loginField');
+const regUserGroup = document.getElementById('regUserGroup');
+const regEmailGroup = document.getElementById('regEmailGroup');
+const confirmGroup = document.getElementById('confirmGroup');
+const pupils = document.querySelectorAll('.pupil');
+const critters = document.querySelectorAll('.critter');
+
+let mode = 'login';
+let targetX = 0, targetY = 0, curX = 0, curY = 0;
+
+// ===== 眼睛平滑跟随 (lerp) =====
+document.addEventListener('mousemove', (e) => {
+  targetX = (e.clientX / window.innerWidth - .5) * 2;
+  targetY = (e.clientY / window.innerHeight - .5) * 2;
+});
+
+function animateEyes() {
+  curX += (targetX - curX) * .12;
+  curY += (targetY - curY) * .12;
+  pupils.forEach(p => {
+    p.style.transform = `translate(calc(-50% + ${curX * 5}px), calc(-50% + ${curY * 5}px))`;
+  });
+  requestAnimationFrame(animateEyes);
+}
+animateEyes();
+
+// ===== 输入框焦点 =====
+loginInput.addEventListener('focus', () => mascotArea.classList.add('mascot-focused'));
+loginInput.addEventListener('blur', () => mascotArea.classList.remove('mascot-focused'));
+usernameInput.addEventListener('focus', () => mascotArea.classList.add('mascot-focused'));
+usernameInput.addEventListener('blur', () => mascotArea.classList.remove('mascot-focused'));
+emailInput.addEventListener('focus', () => mascotArea.classList.add('mascot-focused'));
+emailInput.addEventListener('blur', () => mascotArea.classList.remove('mascot-focused'));
+
+passwordInput.addEventListener('focus', () => mascotArea.classList.add('mascot-shy'));
+passwordInput.addEventListener('blur', () => mascotArea.classList.remove('mascot-shy'));
+confirmInput.addEventListener('focus', () => mascotArea.classList.add('mascot-shy'));
+confirmInput.addEventListener('blur', () => mascotArea.classList.remove('mascot-shy'));
+
+// ===== 模式切换 =====
+function setMode(m) {
+  mode = m;
+  if (m === 'login') {
+    formTitle.textContent = '欢迎回来';
+    formSubtitle.textContent = '登录你的咖啡大师账号';
+    submitBtn.textContent = '登 录';
+    switchText.textContent = '还没有账号？';
+    switchBtn.textContent = '立即注册';
+    loginField.style.display = 'block';
+    regUserGroup.style.display = 'none';
+    regEmailGroup.style.display = 'none';
+    confirmGroup.style.display = 'none';
+    usernameInput.value = '';
+    emailInput.value = '';
+    confirmInput.value = '';
+  } else {
+    formTitle.textContent = '创建账号';
+    formSubtitle.textContent = '加入咖啡大师，探索咖啡世界';
+    submitBtn.textContent = '注 册';
+    switchText.textContent = '已有账号？';
+    switchBtn.textContent = '去登录';
+    loginField.style.display = 'none';
+    regUserGroup.style.display = 'block';
+    regEmailGroup.style.display = 'block';
+    confirmGroup.style.display = 'block';
+    loginInput.value = '';
+  }
+  clearErrors();
+}
+switchBtn.addEventListener('click', () => setMode(mode === 'login' ? 'register' : 'login'));
+
+function clearErrors() {
+  ['loginError','emailError','usernameError','passwordError','confirmError'].forEach(id => document.getElementById(id).textContent = '');
+  [loginInput, emailInput, usernameInput, passwordInput, confirmInput].forEach(el => el.classList.remove('error'));
+}
+function showFieldError(fid, eid, msg) {
+  document.getElementById(fid).classList.add('error');
+  document.getElementById(eid).textContent = msg;
+}
+function shakeAll() {
+  critters.forEach(c => { c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 500); });
+}
+function toast(msg, type) {
+  const old = document.querySelector('.toast'); if (old) old.remove();
+  const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
+}
+
+// ===== 提交 =====
+submitBtn.addEventListener('click', () => {
+  const loginVal = loginInput.value.trim();
+  const email = emailInput.value.trim();
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+  const confirm = confirmInput.value;
+  clearErrors();
+  let valid = true;
+  if (mode === 'login') {
+    if (!loginVal) { showFieldError('loginInput','loginError','请输入用户名或邮箱'); valid = false; }
+  } else {
+    if (!username || username.length < 2) { showFieldError('usernameInput','usernameError','用户名至少2个字符'); valid = false; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showFieldError('emailInput','emailError','请输入有效的邮箱地址'); valid = false; }
+  }
+  if (!password || password.length < 4) { showFieldError('passwordInput','passwordError','密码至少4个字符'); valid = false; }
+  if (mode === 'register' && password !== confirm) { showFieldError('confirmInput','confirmError','两次密码不一致'); valid = false; }
+  if (!valid) { shakeAll(); return; }
+
+  submitBtn.disabled = true;
+  mascotArea.classList.add('mascot-submit');
+
+  const endpoint = mode === 'login' ? '/api/login' : '/api/register';
+  const body = mode === 'login'
+    ? JSON.stringify({ username: loginVal, password })
+    : JSON.stringify({ email, username, password });
+
+  fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body })
+    .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+    .then(({ ok, data }) => {
+      if (!ok) { toast(data.error || '请求失败','error'); shakeAll(); mascotArea.classList.remove('mascot-submit'); submitBtn.disabled = false; return; }
+      toast(mode === 'register' ? '注册成功！跳转中...' : '登录成功！跳转中...', 'success');
+      setTimeout(() => { window.location.href = '/'; }, 600);
+    })
+    .catch(() => { toast('网络错误','error'); shakeAll(); mascotArea.classList.remove('mascot-submit'); submitBtn.disabled = false; });
+});
+
+document.addEventListener('keydown', e => { if (e.key==='Enter' && document.activeElement?.tagName==='INPUT') submitBtn.click(); });
+setMode('login');
+</script>
+</body>
+</html>
