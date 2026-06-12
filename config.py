@@ -23,5 +23,11 @@ class Config:
     PORT = int(os.getenv("PORT", "5000"))
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+    # MySQL（不设置则使用 SQLite）
+    MYSQL_HOST = os.getenv("MYSQL_HOST", "")
+    MYSQL_USER = os.getenv("MYSQL_USER", "")
+    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "coffee_ai")
+
     # HuggingFace 镜像（国内加速）
     HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
