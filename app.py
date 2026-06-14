@@ -53,7 +53,16 @@ class LLMClient:
             temperature=0.7,
             max_tokens=1024,
         )
-        return resp.choices[0].message.content
+        msg = resp.choices[0].message
+        try:
+            content = msg.content
+        except (KeyError, AttributeError):
+            content = None
+        if content is None:
+            content = getattr(msg, "reasoning_content", None)
+        if content is None:
+            raise RuntimeError(f"LLM 返回空内容 (finish_reason={resp.choices[0].finish_reason})")
+        return content
 
 
 def create_app():
