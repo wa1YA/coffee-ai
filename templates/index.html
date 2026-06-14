@@ -140,82 +140,34 @@
   .input-area {
     padding: 12px 24px 20px;
     border-top: 1px solid var(--border);
-    flex-shrink: 0;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    gap: 10px;
+    flex-shrink: 0;
   }
-  .input-wrap {
-    position: relative;
-    width: 100%;
-    max-width: 600px;
-  }
-  .input-wrap textarea {
-    width: 100%;
-    padding: 14px 52px 14px 22px;
-    border: none;
-    border-radius: 28px;
+  .input-area input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
     font-size: 14px;
-    font-family: inherit;
     outline: none;
-    resize: none;
-    line-height: 1.4;
-    background: rgba(0,0,0,.04);
-    color: var(--text);
-    transition: background .2s, box-shadow .2s;
-    min-height: 52px;
-    max-height: 180px;
-  }
-  .input-wrap textarea:focus {
-    background: rgba(0,0,0,.06);
-    box-shadow: 0 0 0 2px var(--accent);
-  }
-  .input-wrap textarea:disabled {
-    opacity: .6;
-  }
-  .input-wrap textarea::placeholder {
-    color: rgba(0,0,0,.45);
+    transition: border-color .2s;
   }
   .input-area input:focus { border-color: var(--accent); }
-  .input-wrap .send-btn {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+  .input-area button {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     border: none;
-    background: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background .15s;
-    color: var(--text);
-  }
-  .input-wrap .send-btn:hover:not(:disabled) { background: rgba(0,0,0,.08); }
-  .input-wrap .send-btn:disabled { cursor: default; opacity: .3; }
-  .input-wrap .send-btn.has-text { background: rgba(0,0,0,.06); }
-
-  .spinner-square {
-    width: 14px; height: 14px;
     background: var(--accent);
-    border-radius: 3px;
-    animation: spin3d 3s linear infinite;
+    color: #fff;
+    cursor: pointer;
+    font-size: 18px;
+    transition: opacity .2s;
+    flex-shrink: 0;
   }
-  @keyframes spin3d {
-    0%   { transform: perspective(40px) rotateY(0deg); }
-    100% { transform: perspective(40px) rotateY(360deg); }
-  }
-  .status-line {
-    font-size: 11px;
-    color: var(--muted);
-    height: 14px;
-    padding-left: 22px;
-    align-self: flex-start;
-  }
+  .input-area button:hover { opacity: .85; }
+  .input-area button:disabled { opacity: .5; cursor: default; }
 
   .quick-asks {
     padding: 0 24px 8px;
@@ -278,14 +230,8 @@
   </div>
 
   <div class="input-area">
-    <div class="input-wrap">
-      <textarea id="inputBox" placeholder="输入你的问题..." rows="1" autofocus></textarea>
-      <button id="sendBtn" class="send-btn">
-        <svg id="sendIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
-        <div id="sendSpinner" class="spinner-square" style="display:none"></div>
-      </button>
-    </div>
-    <div class="status-line" id="statusLine">Ready to submit!</div>
+    <input type="text" id="inputBox" placeholder="输入你的问题..." autofocus>
+    <button id="sendBtn">↑</button>
   </div>
 </div>
 
@@ -315,37 +261,6 @@ async function logout() {
 const chatArea = document.getElementById('chatArea');
 const inputBox = document.getElementById('inputBox');
 const sendBtn = document.getElementById('sendBtn');
-const sendIcon = document.getElementById('sendIcon');
-const sendSpinner = document.getElementById('sendSpinner');
-const statusLine = document.getElementById('statusLine');
-
-// ===== 自动撑高 textarea =====
-function autoResize() {
-  inputBox.style.height = '52px';
-  const newH = Math.min(inputBox.scrollHeight, 180);
-  inputBox.style.height = newH + 'px';
-}
-
-inputBox.addEventListener('input', () => {
-  autoResize();
-  const has = inputBox.value.trim().length > 0;
-  sendBtn.classList.toggle('has-text', has);
-});
-
-// ===== 按钮状态 =====
-function setLoading(loading) {
-  sendBtn.disabled = loading || !inputBox.value.trim();
-  sendIcon.style.display = loading ? 'none' : 'block';
-  sendSpinner.style.display = loading ? 'block' : 'none';
-  inputBox.disabled = loading;
-  statusLine.textContent = loading ? 'AI is thinking...' : 'Ready to submit!';
-}
-
-function updateBtn() {
-  sendBtn.disabled = !inputBox.value.trim();
-}
-
-inputBox.addEventListener('input', updateBtn);
 
 function addMsg(role, text, meta) {
   const div = document.createElement('div');
@@ -390,13 +305,11 @@ function esc(s) {
 
 async function send(msg) {
   const text = msg || inputBox.value.trim();
-  if (!text || sendBtn.disabled) return;
+  if (!text) return;
 
   addMsg('user', esc(text));
   inputBox.value = '';
-  autoResize();
-  setLoading(true);
-  sendBtn.classList.remove('has-text');
+  sendBtn.disabled = true;
 
   const meta = [];
 
@@ -423,15 +336,12 @@ async function send(msg) {
     addMsg('assistant', '请求失败: ' + esc(err.message), [{ label: '错误', cls: 'tag-blocked' }]);
   }
 
-  setLoading(false);
-  updateBtn();
+  sendBtn.disabled = false;
   inputBox.focus();
 }
 
 sendBtn.addEventListener('click', () => send());
-inputBox.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-});
+inputBox.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 
 document.getElementById('quickAsks').addEventListener('click', e => {
   if (e.target.tagName === 'BUTTON') send(e.target.dataset.q);
