@@ -19,8 +19,10 @@ MYSQL_DB = os.getenv("MYSQL_DB", "coffee_ai")
 SQLITE_PATH = os.path.join(os.path.dirname(__file__), "users.db")
 
 
+_mysql_ok = bool(MYSQL_HOST)
+
 def _is_mysql():
-    return bool(MYSQL_HOST)
+    return _mysql_ok
 
 
 def _get_mysql_conn():
@@ -54,37 +56,44 @@ def get_db():
 
 def init_db():
     if _is_mysql():
-        with _get_mysql_conn() as conn:
-            conn.cursor().execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id         INT AUTO_INCREMENT PRIMARY KEY,
-                    email      VARCHAR(255) NOT NULL UNIQUE,
-                    username   VARCHAR(64)  NOT NULL UNIQUE,
-                    password   VARCHAR(255) NOT NULL,
-                    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """)
-            conn.commit()
-        print("[Auth] [OK] 使用 MySQL 数据库")
-    else:
-        import sqlite3
-        with sqlite3.connect(SQLITE_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email      TEXT    NOT NULL UNIQUE,
-                    username   TEXT    NOT NULL UNIQUE,
-                    password   TEXT    NOT NULL,
-                    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-                )
-            """)
-            cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-            if "email" not in cols:
-                conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
-                conn.execute("UPDATE users SET email = username || '@user.local' WHERE email IS NULL")
-            conn.commit()
-        print("[Auth] [OK] 使用 SQLite 数据库")
+        try:
+            with _get_mysql_conn() as conn:
+                conn.cursor().execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id         INT AUTO_INCREMENT PRIMARY KEY,
+                        email      VARCHAR(255) NOT NULL UNIQUE,
+                        username   VARCHAR(64)  NOT NULL UNIQUE,
+                        password   VARCHAR(255) NOT NULL,
+                        created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+                conn.commit()
+            print("[Auth] [OK] 使用 MySQL 数据库")
+            return
+        except Exception as e:
+            global _mysql_ok
+            _mysql_ok = False
+            print(f"[Auth] [WARN] MySQL 连接失败({e})，降级到 SQLite")
+
+    # SQLite 兜底
+    import sqlite3
+    with sqlite3.connect(SQLITE_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                email      TEXT    NOT NULL UNIQUE,
+                username   TEXT    NOT NULL UNIQUE,
+                password   TEXT    NOT NULL,
+                created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "email" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            conn.execute("UPDATE users SET email = username || '@user.local' WHERE email IS NULL")
+        conn.commit()
+    print("[Auth] [OK] 使用 SQLite 数据库")
 
 
 def register_user(email: str, username: str, password: str) -> tuple:
