@@ -19,7 +19,7 @@ MYSQL_DB = os.getenv("MYSQL_DB", "coffee_ai")
 SQLITE_PATH = os.path.join(os.path.dirname(__file__), "users.db")
 
 
-_mysql_ok = bool(MYSQL_HOST)
+_mysql_ok = bool(MYSQL_HOST) and os.getenv("FORCE_SQLITE", "").lower() not in ("true", "1", "yes")
 
 def _is_mysql():
     return _mysql_ok

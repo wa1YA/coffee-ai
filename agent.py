@@ -5,7 +5,20 @@ AI Agent：意图识别 → 路由分发 → 执行 → 响应
 
 import re
 import time
+import logging
 from typing import Optional
+
+log = logging.getLogger(__name__)
+
+try:
+    from soweak.detectors.pattern_match import PatternMatchDetector
+    from soweak.detectors.patterns import PROMPT_INJECTION_PACK
+    from soweak.core.types import Payload, Boundary, Context
+    _soweak_detector = PatternMatchDetector(PROMPT_INJECTION_PACK)
+    SOWEAK_READY = True
+except ImportError:
+    _soweak_detector = None
+    SOWEAK_READY = False
 
 
 class ConversationState:
@@ -84,7 +97,7 @@ class IntentRecognizer:
 # ============================================================
 
 class SafetyFilter:
-    """安全拦截层：危险操作硬限制"""
+    """安全拦截层：soweak OWASP 扫描 + 正则硬限制"""
 
     BLOCKED_PATTERNS = [
         (r"(删除|删掉|移除|清空)\s*(所有|全部|整个)?\s*(数据|数据库|文档|记录)", "删除操作涉及数据安全，已被拦截。请在管理界面手动执行。"),
@@ -94,7 +107,17 @@ class SafetyFilter:
 
     @classmethod
     def check(cls, message: str) -> tuple[bool, Optional[str]]:
-        """返回 (是否安全, 拦截原因)"""
+        """返回 (是否安全, 拦截原因)。先 soweak OWASP 扫描，再正则匹配。"""
+        if SOWEAK_READY:
+            try:
+                payload = Payload(boundary=Boundary.INPUT, text=message)
+                signals = list(_soweak_detector.inspect(payload, Context()))
+                if signals:
+                    worst = max(signals, key=lambda s: s.severity.value)
+                    return False, f"[soweak] {worst.message}"
+            except Exception:
+                pass
+
         for pattern, reason in cls.BLOCKED_PATTERNS:
             if re.search(pattern, message):
                 return False, reason
@@ -114,6 +137,86 @@ class AIAgent:
         self.conversations = ConversationState(ttl_minutes=30)
         self.intent_recognizer = IntentRecognizer()
         self.safety_filter = SafetyFilter()
+
+    def prepare(self, message: str, user_id: str = "default") -> dict:
+        """准备阶段：安全过滤 → 意图识别 → RAG检索（不调用LLM）"""
+        t0 = time.time()
+        self.conversations.cleanup()
+
+        safe, reason = self.safety_filter.check(message)
+        if not safe:
+            return {
+                "reply": reason,
+                "action": "blocked",
+                "retrieved": [],
+                "intent": "blocked",
+                "mode": "规则拦截",
+                "elapsed_ms": (time.time() - t0) * 1000,
+                "use_llm": False,
+            }
+
+        intent, confidence = self.intent_recognizer.recognize(message)
+
+        if intent.startswith("query_"):
+            retrieved = self.rag.retrieve(message, top_k=3)
+            prompt = self.rag.build_prompt(message, retrieved)
+            llm_ok = self.llm is not None
+            return {
+                "action": intent,
+                "retrieved": [{"title": d["title"], "score": d["score"], "preview": d["content"][:100]} for d in retrieved],
+                "intent": intent,
+                "confidence": round(confidence, 2),
+                "mode": "RAG+LLM" if llm_ok else "RAG(Demo)",
+                "use_llm": llm_ok,
+                "prompt": prompt,
+                "elapsed_ms": round((time.time() - t0) * 1000, 1),
+            }
+
+        if intent == "greeting":
+            return {
+                "reply": "哟，来了啊！我是老马，在这条街开了几十年咖啡店，街坊都叫我咖啡大叔。不管是挑豆子、烘豆子、手冲还是意式，你尽管问！",
+                "action": "greeting",
+                "retrieved": [],
+                "intent": "greeting",
+                "confidence": 1.0,
+                "mode": "规则响应",
+                "elapsed_ms": round((time.time() - t0) * 1000, 1),
+                "use_llm": False,
+            }
+
+        # chat / fallback
+        if self.llm:
+            return {
+                "action": "chat",
+                "retrieved": [],
+                "intent": "chat",
+                "confidence": 0.0,
+                "mode": "LLM",
+                "use_llm": True,
+                "prompt": message,
+                "elapsed_ms": round((time.time() - t0) * 1000, 1),
+            }
+
+        retrieved = self.rag.retrieve(message, top_k=2)
+        if retrieved and retrieved[0]["score"] > 0.3:
+            reply = "（Demo模式）根据你的问题，我找到了以下相关内容：\n\n"
+            reply += self._format_retrieved(retrieved)
+            mode = "RAG(Demo兜底)"
+        else:
+            reply = "（Demo模式）未找到相关内容，也暂未配置LLM。请尝试更具体的问题。"
+            mode = "Fallback"
+            retrieved = []
+
+        return {
+            "reply": reply,
+            "action": "chat",
+            "retrieved": [{"title": d["title"], "score": d["score"], "preview": d["content"][:100]} for d in (retrieved or [])],
+            "intent": "chat",
+            "confidence": 0.0,
+            "mode": mode,
+            "elapsed_ms": round((time.time() - t0) * 1000, 1),
+            "use_llm": False,
+        }
 
     def process(self, message: str, user_id: str = "default") -> dict:
         """
@@ -184,11 +287,12 @@ class AIAgent:
 
     def _handle_greeting(self, t0: float) -> dict:
         return {
-            "reply": "你好！我是AI知识助手，支持以下功能：\n\n"
-                     "  RAG检索问答 — 问我AI技术相关问题\n"
-                     "  Agent意图识别 — 自动识别你的意图并路由\n"
-                     "  安全防护 — 危险操作自动拦截\n\n"
-                     "你可以问我：RAG是什么？LoRA怎么用？向量数据库怎么选？",
+            "reply": "哟，来啦！我是老马，在这条街开了几十年咖啡店，街坊都叫我咖啡大叔。\n\n"
+                     "  ☕ 咖啡豆品种 — 阿拉比卡、罗布斯塔有什么区别？\n"
+                     "  🌿 处理法 — 日晒、水洗、蜜处理怎么选？\n"
+                     "  🔥 烘焙 — 浅烘、中烘、深烘风味特点？\n"
+                     "  🫖 冲煮 — 手冲、意式、冷萃怎么玩？\n\n"
+                     "有啥想了解的，尽管问我老马！",
             "action": "greeting",
             "retrieved": [],
             "intent": "greeting",

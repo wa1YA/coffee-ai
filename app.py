@@ -4,7 +4,7 @@
 import os
 import sys
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, Response
 
 # Windows GBK 编码修复
 if sys.platform == "win32":
@@ -42,7 +42,7 @@ class LLMClient:
         if not self._client:
             raise RuntimeError("LLM 未配置")
         if system is None:
-            system = "你是一个资深的咖啡专家，精通咖啡豆品种、处理法、烘焙、冲煮和品鉴。请基于参考资料用中文回答，条理清晰，口语化。"
+            system = "你是老马，一个开了几十年咖啡店的大胡子店主，街坊都叫你'咖啡大叔'。你精通咖啡豆品种、处理法、烘焙、冲煮和品鉴，说起咖啡如数家珍。说话风格：热情豪爽，喜欢用生活化的比喻，偶尔带点江湖气，像跟熟客聊天一样。请基于参考资料用中文回答，条理清晰，口语化。"
 
         resp = self._client.chat.completions.create(
             model=self.model,
@@ -63,6 +63,32 @@ class LLMClient:
         if content is None:
             raise RuntimeError(f"LLM 返回空内容 (finish_reason={resp.choices[0].finish_reason})")
         return content
+
+    def stream(self, message: str, system: str = None):
+        """流式生成器，逐 chunk yield delta 文本"""
+        if not self._client:
+            raise RuntimeError("LLM 未配置")
+        if system is None:
+            system = "你是老马，一个开了几十年咖啡店的大胡子店主，街坊都叫你'咖啡大叔'。你精通咖啡豆品种、处理法、烘焙、冲煮和品鉴，说起咖啡如数家珍。说话风格：热情豪爽，喜欢用生活化的比喻，偶尔带点江湖气，像跟熟客聊天一样。请基于参考资料用中文回答，条理清晰，口语化。"
+
+        resp = self._client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": message},
+            ],
+            temperature=0.7,
+            max_tokens=1024,
+            stream=True,
+        )
+        for chunk in resp:
+            delta = chunk.choices[0].delta
+            try:
+                content = delta.content
+            except (KeyError, AttributeError):
+                content = None
+            if content:
+                yield content
 
 
 def create_app():
@@ -133,6 +159,60 @@ def create_app():
             "retrieved": result.get("retrieved", []),
             "elapsed_ms": result["elapsed_ms"],
         })
+
+    @app.route("/api/chat/stream", methods=["POST"])
+    @login_required
+    def chat_stream():
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "请求格式错误"}), 400
+        message = (data.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "消息不能为空"}), 400
+
+        prep = agent.prepare(message, session["username"])
+
+        if prep.get("action") == "blocked":
+            return jsonify({
+                "reply": prep["reply"],
+                "intent": prep["intent"],
+                "mode": prep["mode"],
+                "retrieved": prep.get("retrieved", []),
+                "elapsed_ms": prep["elapsed_ms"],
+            })
+
+        if not prep.get("use_llm"):
+            return jsonify({
+                "reply": prep["reply"],
+                "intent": prep["intent"],
+                "confidence": prep.get("confidence", 0),
+                "mode": prep["mode"],
+                "retrieved": prep.get("retrieved", []),
+                "elapsed_ms": prep["elapsed_ms"],
+            })
+
+        import json as _json
+
+        def generate():
+            meta = _json.dumps({
+                "type": "meta",
+                "intent": prep["intent"],
+                "mode": prep["mode"],
+                "confidence": prep.get("confidence", 0),
+                "retrieved": prep.get("retrieved", []),
+                "elapsed_ms": prep["elapsed_ms"],
+            }, ensure_ascii=False)
+            yield f"data: {meta}\n\n"
+
+            try:
+                for token in llm.stream(prep["prompt"]):
+                    yield f"data: {_json.dumps({'type': 'token', 'text': token}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {_json.dumps({'type': 'error', 'text': str(e)}, ensure_ascii=False)}\n\n"
+
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+
+        return Response(generate(), mimetype="text/event-stream")
 
     @app.route("/api/stats", methods=["GET"])
     @login_required
